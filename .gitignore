@@ -1,0 +1,6 @@
+surya-fork/
+venv/
+__pycache__/
+*.pyc
+*.pdf
+prompt1.txt
