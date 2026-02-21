@@ -32,19 +32,19 @@ pip install 'marker-pdf==1.10.2'
 if [ ! -d "$SURYA_FORK_DIR" ]; then
     echo "Cloning surya-ocr ${SURYA_TAG} into ${SURYA_FORK_DIR}..."
     git clone "$SURYA_REPO" "$SURYA_FORK_DIR"
-    cd "$SURYA_FORK_DIR"
-    git checkout "$SURYA_TAG"
-    cd "$SCRIPT_DIR"
 fi
 
-# Always (re-)apply patches to ensure the fork is correctly patched
-echo "Applying MPS patches to surya-fork..."
+# Reset the full repo to the exact tag before applying patches
+echo "Resetting surya-fork to ${SURYA_TAG}..."
 cd "$SURYA_FORK_DIR"
-git checkout "$SURYA_TAG" -- surya/table_rec/loader.py surya/table_rec/__init__.py surya/common/adetr/decoder.py 2>/dev/null || true
+git checkout "$SURYA_TAG" -- .
+
+# Apply patches and verify each one took effect
+echo "Applying MPS patches to surya-fork..."
 
 # Patch 1: loader.py — keep device=mps, force float32
 python3 -c "
-import pathlib
+import pathlib, sys
 p = pathlib.Path('surya/table_rec/loader.py')
 src = p.read_text()
 old = '''    if device == \"mps\":
@@ -58,28 +58,37 @@ new = '''    if device == \"mps\":
                 \"TableRecEncoderDecoderModel: using float32 on MPS for kernel compatibility\"
             )
             dtype = torch.float32'''
+if old not in src:
+    print('ERROR: loader.py patch target not found — wrong surya version?', file=sys.stderr)
+    sys.exit(1)
 p.write_text(src.replace(old, new))
 print('  Patched loader.py')
 "
 
 # Patch 2: __init__.py — replace cumsum with arange
 python3 -c "
-import pathlib
+import pathlib, sys
 p = pathlib.Path('surya/table_rec/__init__.py')
 src = p.read_text()
 old = 'decoder_position_ids = torch.ones_like(batch_input_ids[0, :, 0], dtype=torch.int64, device=self.model.device).cumsum(\n            0) - 1'
 new = 'decoder_position_ids = torch.arange(batch_input_ids.shape[1], dtype=torch.int64, device=self.model.device)'
+if old not in src:
+    print('ERROR: __init__.py patch target not found — wrong surya version?', file=sys.stderr)
+    sys.exit(1)
 p.write_text(src.replace(old, new))
 print('  Patched __init__.py')
 "
 
 # Patch 3: decoder.py — extend mask fixup to MPS
 python3 -c "
-import pathlib
+import pathlib, sys
 p = pathlib.Path('surya/common/adetr/decoder.py')
 src = p.read_text()
 old = 'if attention_mask is not None and attention_mask.device.type == \"cuda\":'
 new = 'if attention_mask is not None and attention_mask.device.type in (\"cuda\", \"mps\"):'
+if old not in src:
+    print('ERROR: decoder.py patch target not found — wrong surya version?', file=sys.stderr)
+    sys.exit(1)
 p.write_text(src.replace(old, new))
 print('  Patched decoder.py')
 "
