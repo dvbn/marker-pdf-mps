@@ -1,6 +1,8 @@
 surya-fork/
 venv/
+output/
 __pycache__/
 *.pyc
 *.pdf
-prompt1.txt
+prompt*.txt
+.DS_Store

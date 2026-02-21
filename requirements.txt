@@ -1,0 +1,4 @@
+marker-pdf==1.10.2
+# surya-ocr==0.17.1 is installed from the patched fork — see setup_venv.sh
+# Pin torch to the 2.x series that supports MPS
+torch>=2.7.0,<3.0.0
