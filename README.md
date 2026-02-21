@@ -71,4 +71,4 @@ See `requirements.txt` for details. Future versions of surya may fix this upstre
 
 ## Credits
 
-This fix was built by David Benatia (https://davidbenatia.com) with [Claude Code](https://claude.ai/claude-code) (Anthropic) and audited with [Codex CLI](https://github.com/openai/codex) (OpenAI).
+This fix was built by David Benatia (https://davidbenatia.com).
