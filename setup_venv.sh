@@ -6,7 +6,6 @@ VENV_DIR="${SCRIPT_DIR}/venv"
 SURYA_FORK_DIR="${SCRIPT_DIR}/surya-fork"
 SURYA_REPO="https://github.com/VikParuchuri/surya.git"
 SURYA_TAG="v0.17.1"
-SURYA_BRANCH="mps-table-rec-fix"
 
 echo "=== marker-pdf MPS Acceleration: venv setup ==="
 
@@ -29,20 +28,22 @@ pip install --upgrade pip
 echo "Installing marker-pdf==1.10.2..."
 pip install 'marker-pdf==1.10.2'
 
-# Clone and patch surya-ocr fork
-if [ -d "$SURYA_FORK_DIR" ]; then
-    echo "surya-fork already exists, skipping clone."
-else
+# Clone surya-ocr if needed
+if [ ! -d "$SURYA_FORK_DIR" ]; then
     echo "Cloning surya-ocr ${SURYA_TAG} into ${SURYA_FORK_DIR}..."
     git clone "$SURYA_REPO" "$SURYA_FORK_DIR"
     cd "$SURYA_FORK_DIR"
     git checkout "$SURYA_TAG"
-    git checkout -b "$SURYA_BRANCH"
+    cd "$SCRIPT_DIR"
+fi
 
-    echo "Applying MPS patches..."
+# Always (re-)apply patches to ensure the fork is correctly patched
+echo "Applying MPS patches to surya-fork..."
+cd "$SURYA_FORK_DIR"
+git checkout "$SURYA_TAG" -- surya/table_rec/loader.py surya/table_rec/__init__.py surya/common/adetr/decoder.py 2>/dev/null || true
 
-    # Patch 1: loader.py — keep device=mps, force float32
-    python3 -c "
+# Patch 1: loader.py — keep device=mps, force float32
+python3 -c "
 import pathlib
 p = pathlib.Path('surya/table_rec/loader.py')
 src = p.read_text()
@@ -61,8 +62,8 @@ p.write_text(src.replace(old, new))
 print('  Patched loader.py')
 "
 
-    # Patch 2: __init__.py — replace cumsum with arange
-    python3 -c "
+# Patch 2: __init__.py — replace cumsum with arange
+python3 -c "
 import pathlib
 p = pathlib.Path('surya/table_rec/__init__.py')
 src = p.read_text()
@@ -72,8 +73,8 @@ p.write_text(src.replace(old, new))
 print('  Patched __init__.py')
 "
 
-    # Patch 3: decoder.py — extend mask fixup to MPS
-    python3 -c "
+# Patch 3: decoder.py — extend mask fixup to MPS
+python3 -c "
 import pathlib
 p = pathlib.Path('surya/common/adetr/decoder.py')
 src = p.read_text()
@@ -83,10 +84,7 @@ p.write_text(src.replace(old, new))
 print('  Patched decoder.py')
 "
 
-    git add -A
-    git commit -m "Enable MPS (Apple Silicon GPU) for TableRecEncoderDecoderModel"
-    cd "$SCRIPT_DIR"
-fi
+cd "$SCRIPT_DIR"
 
 # Install the fork in editable mode (overrides PyPI surya-ocr)
 echo "Installing surya-ocr fork (editable)..."
